@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Field Scribe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fs-bg: #1c211f;
+    --fs-surface: #262c29;
+    --fs-surface-2: #313834;
+    --fs-border: #3d453f;
+    --fs-text: #edeee6;
+    --fs-text-dim: #9aa79e;
+    --fs-accent: #f2b705;
+    --fs-accent-dark: #c98e00;
+    --fs-success: #4c9a6a;
+    --fs-danger: #c1443c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Barlow', Arial, sans-serif;
+    background: var(--fs-bg);
+    color: var(--fs-text);
+    min-height: 100vh;
+  }
+  .stencil { font-family: 'Oswald', Arial, sans-serif; letter-spacing: 0.03em; text-transform: uppercase; }
+  .mono { font-family: 'IBM Plex Mono', 'Courier New', monospace; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+  .row { display: flex; align-items: center; }
+  .between { justify-content: space-between; }
+  .header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .title { font-size: 28px; font-weight: 700; }
+  .subtitle { font-size: 11px; color: var(--fs-text-dim); margin-top: 2px; }
+  .tape {
+    height: 14px; margin: 18px 0 24px;
+    background: repeating-linear-gradient(90deg, var(--fs-accent), var(--fs-accent) 6px, var(--fs-bg) 6px, var(--fs-bg) 7px);
+    opacity: 0.9; border-radius: 2px;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; }
+  .btn { transition: transform .08s ease, filter .15s ease; }
+  .btn:active { transform: scale(0.97); }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; filter: none; }
+
+  .job-btn {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px;
+    background: var(--fs-surface); border: 1px solid var(--fs-border); color: var(--fs-text);
+  }
+  .job-panel {
+    position: absolute; right: 16px; margin-top: 6px; width: 260px; max-height: 300px; overflow-y: auto;
+    background: var(--fs-surface); border: 1px solid var(--fs-border); border-radius: 6px; z-index: 30;
+    box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  }
+  .job-panel.hidden { display: none; }
+  .job-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 6px; cursor: pointer; }
+  .job-item:hover { background: rgba(0,0,0,.2); }
+  .job-item.active { background: var(--fs-surface-2); }
+  .job-item-name { font-size: 14px; text-align: left; background: none; color: var(--fs-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .job-item-meta { font-size: 10px; color: var(--fs-text-dim); }
+  .icon-btn { background: none; padding: 4px; border-radius: 4px; }
+  .icon-btn:hover { background: rgba(0,0,0,.25); }
+
+  .banner { display: flex; gap: 8px; padding: 10px 12px; border-radius: 6px; margin-bottom: 16px; background: var(--fs-surface); border: 1px solid var(--fs-danger); font-size: 13px; color: var(--fs-text-dim); }
+
+  .mic-area { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 24px; }
+  .mic-btn { width: 88px; height: 88px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: var(--fs-accent); font-size: 34px; }
+  .mic-btn.listening { background: var(--fs-danger); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(193,68,60,.55);} 70% { box-shadow: 0 0 0 22px rgba(193,68,60,0);} 100% { box-shadow: 0 0 0 0 rgba(193,68,60,0);} }
+  .status { font-size: 14px; color: var(--fs-text-dim); text-align: center; min-height: 18px; }
+  .readback-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fs-text-dim); margin-top: 4px; cursor: pointer; user-select: none; }
+
+  .card { background: var(--fs-surface); border: 1px solid var(--fs-accent); border-radius: 8px; padding: 16px; margin-bottom: 24px; }
+  .card-title { font-size: 13px; color: var(--fs-accent); display: flex; justify-content: space-between; margin-bottom: 12px; }
+  .field-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px; }
+  @media (min-width: 520px) { .field-grid { grid-template-columns: repeat(4, 1fr); } }
+  .field label { display: block; font-size: 10px; color: var(--fs-text-dim); margin-bottom: 4px; font-family: 'IBM Plex Mono', monospace; }
+  input, select {
+    background: var(--fs-surface-2); border: 1px solid var(--fs-border); color: var(--fs-text);
+    padding: 7px 8px; border-radius: 5px; width: 100%; font-size: 14px; font-family: inherit;
+  }
+  input:focus, select:focus { outline: 2px solid var(--fs-accent); outline-offset: 1px; }
+  .card-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .pill-btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 5px; font-size: 13px; }
+
+  details.manual { background: var(--fs-surface); border: 1px solid var(--fs-border); border-radius: 8px; margin-bottom: 24px; }
+  summary { padding: 10px 16px; font-size: 12px; color: var(--fs-text-dim); cursor: pointer; }
+  .manual-form { padding: 4px 16px 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; align-items: end; }
+  @media (min-width: 560px) { .manual-form { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 760px) { .manual-form { grid-template-columns: repeat(6, 1fr); } }
+
+  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .count { font-size: 13px; color: var(--fs-text-dim); font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+  .entries-box { border: 1px solid var(--fs-border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+  .empty-state { padding: 32px 16px; text-align: center; font-size: 13px; color: var(--fs-text-dim); }
+  .entry-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--fs-border); }
+  .entry-row:first-child { border-top: none; }
+  .entry-num { font-size: 11px; color: var(--fs-accent-dark); width: 40px; font-family: 'IBM Plex Mono', monospace; }
+  .entry-dim { flex: 1; font-size: 14px; font-family: 'IBM Plex Mono', monospace; }
+  .entry-dim .x { color: var(--fs-text-dim); }
+  .entry-qty { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--fs-surface-2); font-family: 'Oswald', sans-serif; text-transform: uppercase; }
+  .entry-style { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: transparent; border: 1px solid var(--fs-accent); color: var(--fs-accent); font-family: 'Oswald', sans-serif; text-transform: uppercase; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+  .entry-style svg { width: 12px; height: 16px; flex-shrink: 0; }
+
+  .style-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+  .style-swatch {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    width: 58px; padding: 5px 4px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--fs-border); background: var(--fs-surface-2); color: var(--fs-text-dim);
+  }
+  .style-swatch:hover { border-color: var(--fs-accent-dark); }
+  .style-swatch.selected { border-color: var(--fs-accent); color: var(--fs-accent); background: rgba(242,183,5,0.10); }
+  .style-swatch svg { width: 32px; height: 42px; }
+  .style-swatch .swatch-label { font-size: 8.5px; text-align: center; line-height: 1.15; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 0.02em; }
+  .entry-notes { flex: 1; font-size: 12px; color: var(--fs-text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .edit-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--fs-border); background: var(--fs-surface); }
+  .edit-row input { width: 80px; }
+  .edit-row input.notes { flex: 1; min-width: 100px; width: auto; }
+
+  .export-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-bottom: 12px; }
+  .storage-note { text-align: center; font-size: 12px; color: var(--fs-text-dim); }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 18px; border-radius: 6px; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: .03em; font-size: 13px; color: #fff; z-index: 50; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header-top">
+    <div>
+      <div class="title stencil">Field Scribe</div>
+      <div class="subtitle mono">CABINET DOOR TALLY — VOICE CAPTURE</div>
+    </div>
+    <div style="position:relative;">
+      <button class="job-btn btn stencil" id="jobBtn" style="font-size:13px;">
+        <span>📁</span><span id="jobBtnLabel" style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">No job</span><span>▾</span>
+      </button>
+      <div class="job-panel hidden" id="jobPanel"></div>
+    </div>
+  </div>
+
+  <div class="tape"></div>
+
+  <div id="unsupportedBanner" style="display:none;" class="banner">
+    <span>⚠️</span>
+    <span>Voice input isn't supported in this browser. Use manual entry below — try Chrome or Edge for voice capture, and allow microphone access when prompted.</span>
+  </div>
+
+  <div class="mic-area">
+    <button class="mic-btn btn" id="micBtn">🎤</button>
+    <div class="status mono" id="statusText" style="font-family:'Barlow',sans-serif;">Select or create a job to begin.</div>
+    <label class="readback-toggle">
+      <input type="checkbox" id="readBackToggle" checked />
+      <span id="readBackIcon">🔊</span>
+      <span>Read back &amp; ask for verbal confirmation</span>
+    </label>
+    <div id="originNote" style="font-size:11px; color:var(--fs-text-dim); text-align:center; max-width:420px; margin-top:6px; display:none;">
+      Voice not working? Chrome's speech service is unreliable when a page is opened directly from a file.
+      Run it from <code class="mono">http://localhost</code> instead — see the note below the export buttons.
+    </div>
+  </div>
+
+  <div id="draftContainer"></div>
+
+  <details class="manual">
+    <summary class="stencil">Manual Entry</summary>
+    <form class="manual-form" id="manualForm">
+      <div class="field"><label>Width</label><input id="mWidth" placeholder='24 1/2' /></div>
+      <div class="field"><label>Height</label><input id="mHeight" placeholder="36" /></div>
+      <div class="field" style="grid-column: span 2;">
+        <label>Style</label>
+        <div id="mStylePicker"></div>
+      </div>
+      <div class="field"><label>Qty</label><input id="mQty" type="number" min="1" value="1" /></div>
+      <div class="field"><label>Notes</label><input id="mNotes" placeholder="optional" /></div>
+      <button type="submit" class="btn stencil" style="background:var(--fs-accent); color:#1c211f; padding:8px; border-radius:5px; font-size:13px;">➕ Add</button>
+    </form>
+  </details>
+
+  <div class="list-header">
+    <div class="count" id="entryCount">0 Lines · 0 Doors</div>
+    <select id="unitSelect" style="width:auto; font-size:12px; padding:4px 8px;">
+      <option value="in">inches</option>
+      <option value="mm">mm</option>
+      <option value="cm">cm</option>
+    </select>
+  </div>
+
+  <div class="entries-box" id="entriesBox"></div>
+
+  <details class="manual" style="margin-bottom:12px;">
+    <summary class="stencil">Email Settings</summary>
+    <form id="emailSettingsForm" style="padding:4px 16px 16px; display:flex; gap:8px; flex-wrap:wrap; align-items:end;">
+      <div class="field" style="flex:1; min-width:200px;">
+        <label>Default Recipient Email</label>
+        <input type="email" id="defaultEmailInput" placeholder="office@example.com" />
+      </div>
+      <button type="submit" class="btn stencil" style="background:var(--fs-accent); color:#1c211f; padding:8px 14px; border-radius:5px; font-size:13px;">Save</button>
+      <button type="button" id="clearDefaultEmailBtn" class="btn" style="background:var(--fs-surface-2); border:1px solid var(--fs-border); color:var(--fs-text-dim); padding:8px 14px; border-radius:5px; font-size:13px;">Clear</button>
+    </form>
+    <div id="defaultEmailStatus" style="padding:0 16px 14px; font-size:12px; color:var(--fs-text-dim);"></div>
+  </details>
+
+  <div class="export-row">
+    <button class="btn pill-btn" id="exportAllBtn" style="background:var(--fs-surface); border:1px solid var(--fs-border); color:var(--fs-text);">⬇ Export All Jobs (CSV)</button>
+    <button class="btn pill-btn stencil" id="exportJobBtn" style="background:var(--fs-accent); color:#1c211f;">⬇ Export This Job (CSV)</button>
+  </div>
+  <div class="export-row">
+    <button class="btn pill-btn" id="emailAllBtn" style="background:var(--fs-surface); border:1px solid var(--fs-border); color:var(--fs-text);">📧 Email All Jobs</button>
+    <button class="btn pill-btn stencil" id="emailJobBtn" style="background:var(--fs-surface); border:1px solid var(--fs-accent); color:var(--fs-accent);">📧 Email This Job</button>
+  </div>
+
+  <div class="storage-note" id="storageNote" style="display:none;">Note: local storage isn't available — jobs will only last this session.</div>
+
+  <div class="storage-note" id="fileOriginNote" style="display:none; margin-top:10px; line-height:1.6;">
+    You're opening this as a local file, which can make Chrome's voice recognition unreliable or block it outright.<br/>
+    To fix it, serve the folder over localhost instead:<br/>
+    <span class="mono">cd</span> into the folder this file is in, then run <span class="mono">python3 -m http.server 8000</span><br/>
+    and open <span class="mono">http://localhost:8000/field-scribe.html</span> in Chrome.
+  </div>
+</div>
+
+<div id="toastRoot"></div>
+
+<script>
+/* ----------------------------------------------------------------------- */
+/* Helpers: fraction / dimension parsing                                    */
+/* ----------------------------------------------------------------------- */
+function wordsToFraction(s) {
+  return s
+    .replace(/three[\s-]?quarters?/g, "3/4")
+    .replace(/one[\s-]?quarter|a quarter/g, "1/4")
+    .replace(/three[\s-]?eighths?/g, "3/8")
+    .replace(/five[\s-]?eighths?/g, "5/8")
+    .replace(/seven[\s-]?eighths?/g, "7/8")
+    .replace(/one[\s-]?eighth|an eighth/g, "1/8")
+    .replace(/one[\s-]?sixteenth|a sixteenth/g, "1/16")
+    .replace(/(a |one )?half/g, "1/2");
+}
+
+function parseDimensionInput(raw) {
+  if (raw === null || raw === undefined) return null;
+  let s = String(raw).trim().toLowerCase();
+  if (!s) return null;
+  s = s.replace(/inches|inch|in\.?|"|'/g, " ");
+  s = wordsToFraction(s);
+  s = s.replace(/\band\b/g, " ").replace(/\s+/g, " ").trim();
+  if (!s) return null;
+  const m = s.match(/^(\d+)?\s*(\d+)\/(\d+)$/);
+  if (m) {
+    const whole = m[1] ? parseInt(m[1], 10) : 0;
+    const num = parseInt(m[2], 10);
+    const den = parseInt(m[3], 10);
+    if (!den) return null;
+    return whole + num / den;
+  }
+  const f = parseFloat(s);
+  return isNaN(f) ? null : f;
+}
+
+function decimalToFraction(value, denom) {
+  denom = denom || 16;
+  if (value === null || value === undefined || isNaN(value)) return "—";
+  const neg = value < 0 ? "-" : "";
+  value = Math.abs(value);
+  const whole = Math.floor(value);
+  let frac = Math.round((value - whole) * denom);
+  let d = denom;
+  if (frac === d) return neg + (whole + 1) + '"';
+  while (frac !== 0 && frac % 2 === 0 && d % 2 === 0) { frac /= 2; d /= 2; }
+  if (frac === 0) return neg + whole + '"';
+  if (whole === 0) return neg + frac + '/' + d + '"';
+  return neg + whole + ' ' + frac + '/' + d + '"';
+}
+
+/* ----------------------------------------------------------------------- */
+/* Door styles                                                              */
+/* ----------------------------------------------------------------------- */
+const DOOR_STYLES = ["Shaker", "Slab (Flat Panel)", "Raised Panel", "Recessed Panel", "Louvered"];
+
+const STYLE_PATTERNS = [
+  { re: /\bshaker\b/, style: "Shaker" },
+  { re: /\bslab\b|\bflat[\s-]?panel\b/, style: "Slab (Flat Panel)" },
+  { re: /\braised[\s-]?panel\b/, style: "Raised Panel" },
+  { re: /\brecessed[\s-]?panel\b/, style: "Recessed Panel" },
+  { re: /\blouvered\b|\blouvers?\b/, style: "Louvered" },
+];
+
+function detectStyle(text) {
+  for (const p of STYLE_PATTERNS) {
+    if (p.re.test(text)) return { style: p.style, cleaned: text.replace(p.re, " ") };
+  }
+  return { style: "", cleaned: text };
+}
+
+const DOOR_STYLE_ICONS = {
+  "": '<svg viewBox="0 0 60 80"><rect x="3" y="3" width="54" height="74" rx="2" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4" opacity="0.6"/><line x1="14" y1="14" x2="46" y2="66" stroke="currentColor" stroke-width="2" opacity="0.5"/></svg>',
+  "Shaker": '<svg viewBox="0 0 60 80"><rect x="3" y="3" width="54" height="74" rx="2" fill="var(--fs-surface)" stroke="currentColor" stroke-width="2.5"/><rect x="13" y="13" width="34" height="54" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  "Slab (Flat Panel)": '<svg viewBox="0 0 60 80"><rect x="3" y="3" width="54" height="74" rx="2" fill="var(--fs-surface)" stroke="currentColor" stroke-width="2.5"/><line x1="10" y1="18" x2="50" y2="18" stroke="currentColor" stroke-width="1" opacity="0.4"/><line x1="10" y1="34" x2="50" y2="34" stroke="currentColor" stroke-width="1" opacity="0.4"/><line x1="10" y1="50" x2="50" y2="50" stroke="currentColor" stroke-width="1" opacity="0.4"/><line x1="10" y1="66" x2="50" y2="66" stroke="currentColor" stroke-width="1" opacity="0.4"/></svg>',
+  "Raised Panel": '<svg viewBox="0 0 60 80"><rect x="3" y="3" width="54" height="74" rx="2" fill="var(--fs-surface)" stroke="currentColor" stroke-width="2.5"/><rect x="12" y="12" width="36" height="56" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="12" x2="19" y2="19" stroke="currentColor" stroke-width="1.3"/><line x1="48" y1="12" x2="41" y2="19" stroke="currentColor" stroke-width="1.3"/><line x1="12" y1="68" x2="19" y2="61" stroke="currentColor" stroke-width="1.3"/><line x1="48" y1="68" x2="41" y2="61" stroke="currentColor" stroke-width="1.3"/><rect x="19" y="19" width="22" height="42" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>',
+  "Recessed Panel": '<svg viewBox="0 0 60 80"><rect x="3" y="3" width="54" height="74" rx="2" fill="var(--fs-surface)" stroke="currentColor" stroke-width="2.5"/><rect x="15" y="15" width="30" height="50" fill="none" stroke="currentColor" stroke-width="2"/><rect x="18" y="18" width="24" height="44" fill="none" stroke="currentColor" stroke-width="1" opacity="0.6"/></svg>',
+  "Louvered": '<svg viewBox="0 0 60 80"><rect x="3" y="3" width="54" height="74" rx="2" fill="var(--fs-surface)" stroke="currentColor" stroke-width="2.5"/><line x1="10" y1="14" x2="50" y2="10" stroke="currentColor" stroke-width="2.4"/><line x1="10" y1="24" x2="50" y2="20" stroke="currentColor" stroke-width="2.4"/><line x1="10" y1="34" x2="50" y2="30" stroke="currentColor" stroke-width="2.4"/><line x1="10" y1="44" x2="50" y2="40" stroke="currentColor" stroke-width="2.4"/><line x1="10" y1="54" x2="50" y2="50" stroke="currentColor" stroke-width="2.4"/><line x1="10" y1="64" x2="50" y2="60" stroke="currentColor" stroke-width="2.4"/><line x1="10" y1="70" x2="50" y2="66" stroke="currentColor" stroke-width="2.4"/></svg>',
+};
+
+function styleSwatchHtml(targetId, value, label, selected) {
+  const isSel = value === (selected || "");
+  return '<div class="style-swatch' + (isSel ? " selected" : "") + '" data-target="' + targetId + '" data-value="' + escapeHtml(value) + '">' +
+    DOOR_STYLE_ICONS[value] + '<div class="swatch-label">' + escapeHtml(label) + '</div></div>';
+}
+
+function buildStylePicker(id, selected) {
+  let html = '<input type="hidden" id="' + id + '" value="' + escapeHtml(selected || "") + '" />';
+  html += '<div class="style-picker">';
+  html += styleSwatchHtml(id, "", "No Style", selected);
+  DOOR_STYLES.forEach(s => { html += styleSwatchHtml(id, s, s, selected); });
+  html += '</div>';
+  return html;
+}
+
+function parseSpokenMeasurement(transcriptRaw) {
+  let t = " " + transcriptRaw.toLowerCase() + " ";
+  t = wordsToFraction(t);
+  const styleResult = detectStyle(t);
+  const style = styleResult.style;
+  t = styleResult.cleaned;
+  let quantity = 1;
+  const qtyMatch = t.match(/quantity(?:\s+of)?\s+(\d+)|qty\s+(\d+)|\b(\d+)\s+(?:pieces|doors|units|of them)\b/);
+  if (qtyMatch) {
+    quantity = parseInt(qtyMatch[1] || qtyMatch[2] || qtyMatch[3], 10);
+    t = t.replace(qtyMatch[0], " ");
+  }
+  const dimSplit = t.split(/\bby\b|\sx\s/);
+  let width = null, height = null, notes = "";
+  if (dimSplit.length >= 2) {
+    width = parseDimensionInput(dimSplit[0]);
+    height = parseDimensionInput(dimSplit[1]);
+    notes = dimSplit.slice(2).join(" ").replace(/\s+/g, " ").trim();
+  } else {
+    notes = t.replace(/\s+/g, " ").trim();
+  }
+  return { width, height, quantity, notes, style, raw: transcriptRaw };
+}
+
+/* ----------------------------------------------------------------------- */
+/* Storage (localStorage — works offline, persists between visits)          */
+/* ----------------------------------------------------------------------- */
+let storageOk = true;
+try {
+  localStorage.setItem("__fs_test__", "1");
+  localStorage.removeItem("__fs_test__");
+} catch (e) {
+  storageOk = false;
+}
+
+function loadJobs() {
+  if (!storageOk) return [];
+  try { return JSON.parse(localStorage.getItem("fieldscribe_jobs") || "[]"); } catch { return []; }
+}
+function saveJobs(jobs) {
+  if (!storageOk) return;
+  localStorage.setItem("fieldscribe_jobs", JSON.stringify(jobs));
+}
+function loadEntriesFor(jobId) {
+  if (!storageOk) return [];
+  try { return JSON.parse(localStorage.getItem("fieldscribe_entries_" + jobId) || "[]"); } catch { return []; }
+}
+function saveEntriesFor(jobId, list) {
+  if (!storageOk) return;
+  localStorage.setItem("fieldscribe_entries_" + jobId, JSON.stringify(list));
+}
+function deleteEntriesFor(jobId) {
+  if (!storageOk) return;
+  localStorage.removeItem("fieldscribe_entries_" + jobId);
+}
+
+/* ----------------------------------------------------------------------- */
+/* CSV export                                                                */
+/* ----------------------------------------------------------------------- */
+function escapeCsv(val) {
+  const s = String(val ?? "");
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function buildCsv(rows) {
+  const header = ["Job", "Width", "Height", "Unit", "Style", "Quantity", "Notes", "Recorded At"];
+  return [header, ...rows].map(r => r.map(escapeCsv).join(",")).join("\n");
+}
+function downloadTextFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ----------------------------------------------------------------------- */
+/* State                                                                    */
+/* ----------------------------------------------------------------------- */
+const state = {
+  jobs: loadJobs(),
+  currentJobId: null,
+  entries: [],
+  draft: null,
+  editingId: null,
+  unit: "in",
+  readBack: true,
+  listening: false,
+  listenMode: null,
+};
+
+if (state.jobs.length > 0) {
+  state.jobs.sort((a, b) => b.createdAt - a.createdAt);
+  state.currentJobId = state.jobs[0].id;
+  state.entries = loadEntriesFor(state.currentJobId);
+}
+
+/* ----------------------------------------------------------------------- */
+/* Speech setup                                                             */
+/* ----------------------------------------------------------------------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let speechSupported = !!SR;
+
+if (SR) {
+  recognition = new SR();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = "en-US";
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    handleTranscript(transcript, state.listenMode);
+  };
+  recognition.onerror = (e) => {
+    state.listening = false;
+    updateMicButton();
+    let msg = "Didn't catch that. Tap the mic and try again.";
+    if (e && e.error) {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        msg = "Mic access blocked. Click the icon left of the address bar, allow the microphone, then reload the page.";
+      } else if (e.error === "audio-capture") {
+        msg = "No microphone found. Check that one is connected and not in use by another app.";
+      } else if (e.error === "network") {
+        msg = "Network error reaching the speech service. Opening this file directly (file://) often causes this — run it from a local server instead (see the note below the mic).";
+      } else if (e.error === "no-speech") {
+        msg = "No speech detected. Tap the mic and try again.";
+      } else if (e.error === "aborted") {
+        msg = "Listening stopped. Tap the mic to try again.";
+      }
+    }
+    setStatus(msg);
+    console.warn("SpeechRecognition error:", e && e.error);
+  };
+  recognition.onend = () => {
+    state.listening = false;
+    updateMicButton();
+  };
+} else {
+  document.getElementById("unsupportedBanner").style.display = "flex";
+}
+
+function startListening(mode) {
+  if (!speechSupported || !recognition) return;
+  if (!state.currentJobId) { toast("Create a job first", "error"); return; }
+  try {
+    state.listenMode = mode;
+    state.listening = true;
+    updateMicButton();
+    setStatus(mode === "measure" ? "Listening — say size and quantity…" : "Listening — say yes or no…");
+    recognition.start();
+  } catch (e) { state.listening = false; updateMicButton(); }
+}
+function stopListening() {
+  if (recognition) { try { recognition.stop(); } catch (e) {} }
+  state.listening = false;
+  updateMicButton();
+}
+function speak(text, onEnd) {
+  if (!window.speechSynthesis) { if (onEnd) onEnd(); return; }
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 0.98;
+  utter.onend = () => { if (onEnd) onEnd(); };
+  utter.onerror = () => { if (onEnd) onEnd(); };
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utter);
+}
+
+function handleTranscript(transcript, mode) {
+  if (mode === "measure") {
+    const parsed = parseSpokenMeasurement(transcript);
+    state.draft = {
+      width: parsed.width, height: parsed.height,
+      quantity: parsed.quantity || 1, notes: parsed.notes,
+      style: parsed.style || "", unit: state.unit, raw: transcript,
+    };
+    renderDraft();
+    if (parsed.width && parsed.height) {
+      if (state.readBack) {
+        const stylePart = parsed.style ? parsed.style + ", " : "";
+        const text = stylePart + decimalToFraction(parsed.width) + " by " + decimalToFraction(parsed.height) +
+          ", quantity " + (parsed.quantity || 1) + ". Say yes to confirm, or no to redo.";
+        setStatus("Reading back — please wait…");
+        speak(text, () => startListening("confirm"));
+      } else {
+        setStatus("Check the values below, then confirm.");
+      }
+    } else {
+      setStatus("Couldn't catch both dimensions — check and edit below, then confirm.");
+    }
+  } else if (mode === "confirm") {
+    const t = transcript.toLowerCase();
+    if (/\b(yes|yeah|yep|correct|confirm)\b/.test(t)) {
+      commitDraft();
+    } else if (/\b(no|nope|redo|wrong|incorrect)\b/.test(t)) {
+      setStatus("Okay — adjust the values below and confirm manually, or tap the mic to redo.");
+    } else {
+      setStatus("Didn't catch a yes or no. Tap the mic to try the confirmation again.");
+    }
+  }
+}
+
+/* ----------------------------------------------------------------------- */
+/* Job CRUD                                                                  */
+/* ----------------------------------------------------------------------- */
+function createJob(name) {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const id = "job_" + Date.now();
+  const meta = { id, name: trimmed, createdAt: Date.now(), entryCount: 0 };
+  state.jobs.unshift(meta);
+  saveJobs(state.jobs);
+  saveEntriesFor(id, []);
+  state.currentJobId = id;
+  state.entries = [];
+  state.draft = null;
+  renderJobBtn();
+  renderEntries();
+  closeJobPanel();
+  setStatus('Job "' + trimmed + '" ready. Tap the mic and call out a size.');
+}
+function selectJob(id) {
+  state.currentJobId = id;
+  state.entries = loadEntriesFor(id);
+  state.draft = null;
+  renderJobBtn();
+  renderEntries();
+  renderDraft();
+  closeJobPanel();
+  const meta = state.jobs.find(j => j.id === id);
+  setStatus(meta ? 'Loaded "' + meta.name + '". Tap the mic and call out a size.' : "Job loaded.");
+}
+function deleteJob(id) {
+  state.jobs = state.jobs.filter(j => j.id !== id);
+  saveJobs(state.jobs);
+  deleteEntriesFor(id);
+  if (state.currentJobId === id) {
+    if (state.jobs.length > 0) {
+      selectJob(state.jobs[0].id);
+    } else {
+      state.currentJobId = null;
+      state.entries = [];
+      renderJobBtn();
+      renderEntries();
+      setStatus("Create a job to start recording doors.");
+    }
+  }
+  renderJobPanel();
+  toast("Job deleted");
+}
+function persistEntries() {
+  saveEntriesFor(state.currentJobId, state.entries);
+  const meta = state.jobs.find(j => j.id === state.currentJobId);
+  if (meta) { meta.entryCount = state.entries.length; saveJobs(state.jobs); }
+}
+function addEntry(entry) {
+  if (!state.currentJobId) { toast("Create a job first", "error"); return false; }
+  const withId = Object.assign({}, entry, { id: "e_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6), createdAt: Date.now() });
+  state.entries.unshift(withId);
+  persistEntries();
+  renderEntries();
+  return true;
+}
+function deleteEntry(id) {
+  state.entries = state.entries.filter(e => e.id !== id);
+  persistEntries();
+  renderEntries();
+}
+function updateEntryFields(id, patch) {
+  state.entries = state.entries.map(e => e.id === id ? Object.assign({}, e, patch) : e);
+  persistEntries();
+  state.editingId = null;
+  renderEntries();
+}
+
+/* ----------------------------------------------------------------------- */
+/* Draft actions                                                            */
+/* ----------------------------------------------------------------------- */
+function commitDraft() {
+  const d = state.draft;
+  if (!d || d.width == null || d.height == null) { toast("Fill in width and height first", "error"); return; }
+  addEntry({ width: d.width, height: d.height, quantity: d.quantity || 1, unit: d.unit || state.unit, style: d.style || "", notes: d.notes || "" });
+  state.draft = null;
+  renderDraft();
+  setStatus("Saved. Tap the mic and call out the next size.");
+}
+function discardDraft() {
+  state.draft = null;
+  renderDraft();
+  setStatus("Discarded. Tap the mic and call out a size.");
+}
+
+/* ----------------------------------------------------------------------- */
+/* Rendering                                                                 */
+/* ----------------------------------------------------------------------- */
+function setStatus(text) { document.getElementById("statusText").textContent = text; }
+
+function updateMicButton() {
+  const btn = document.getElementById("micBtn");
+  btn.classList.toggle("listening", state.listening);
+  btn.textContent = state.listening ? "⏹" : "🎤";
+  btn.disabled = !speechSupported || !state.currentJobId;
+}
+
+function renderJobBtn() {
+  const meta = state.jobs.find(j => j.id === state.currentJobId);
+  document.getElementById("jobBtnLabel").textContent = meta ? meta.name : "No job";
+  updateMicButton();
+}
+
+function closeJobPanel() { document.getElementById("jobPanel").classList.add("hidden"); }
+
+function renderJobPanel() {
+  const panel = document.getElementById("jobPanel");
+  let html = '<div style="padding:8px;">';
+  if (state.jobs.length === 0) {
+    html += '<div style="font-size:13px; color:var(--fs-text-dim); padding:8px;">No jobs yet.</div>';
+  }
+  state.jobs.forEach(j => {
+    html += '<div class="job-item ' + (j.id === state.currentJobId ? "active" : "") + '">' +
+      '<button class="job-item-name" data-action="select-job" data-id="' + j.id + '">' + escapeHtml(j.name) +
+      '<div class="job-item-meta">' + (j.entryCount || 0) + ' entries</div></button>' +
+      '<button class="icon-btn" data-action="delete-job" data-id="' + j.id + '" title="Delete job">🗑</button></div>';
+  });
+  html += '</div>' +
+    '<div style="border-top:1px solid var(--fs-border); padding:8px;">' +
+    '<form id="newJobForm" style="display:flex; gap:6px;">' +
+    '<input id="newJobName" placeholder="Job name…" style="flex:1; font-size:13px;" />' +
+    '<button type="submit" class="btn" style="background:var(--fs-success); padding:6px 10px; border-radius:5px; color:#fff;">✓</button>' +
+    '</form></div>';
+  panel.innerHTML = html;
+  const form = document.getElementById("newJobForm");
+  if (form) form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    createJob(document.getElementById("newJobName").value);
+  });
+}
+
+function renderDraft() {
+  const el = document.getElementById("draftContainer");
+  const d = state.draft;
+  if (!d) { el.innerHTML = ""; return; }
+  el.innerHTML =
+    '<div class="card">' +
+      '<div class="card-title">' +
+        '<span class="stencil">Pending Measurement</span>' +
+        (d.raw ? '<span class="mono" style="font-size:10px; color:var(--fs-text-dim); text-transform:none;">heard: "' + escapeHtml(d.raw) + '"</span>' : '') +
+      '</div>' +
+      '<div class="field-grid">' +
+        '<div class="field"><label>Width</label><input class="mono" id="dWidth" value="' + (d.width != null ? decimalToFraction(d.width) : "") + '" placeholder="24 1/2" /></div>' +
+        '<div class="field"><label>Height</label><input class="mono" id="dHeight" value="' + (d.height != null ? decimalToFraction(d.height) : "") + '" placeholder="36" /></div>' +
+        '<div class="field"><label>Qty</label><input class="mono" id="dQty" type="number" min="1" value="' + (d.quantity || 1) + '" /></div>' +
+        '<div class="field"><label>Notes</label><input id="dNotes" value="' + escapeHtml(d.notes || "") + '" placeholder="upper left…" /></div>' +
+      '</div>' +
+      '<div class="field" style="margin-bottom:12px;"><label>Style</label>' + buildStylePicker("dStyle", d.style) + '</div>' +
+      '<div class="card-actions">' +
+        '<button class="btn pill-btn" id="discardBtn" style="background:var(--fs-surface-2); border:1px solid var(--fs-border); color:var(--fs-text);">✕ Discard</button>' +
+        '<button class="btn pill-btn stencil" id="confirmBtn" style="background:var(--fs-success); color:#fff;">✓ Confirm &amp; Add</button>' +
+      '</div>' +
+    '</div>';
+  document.getElementById("discardBtn").addEventListener("click", discardDraft);
+  document.getElementById("confirmBtn").addEventListener("click", () => {
+    state.draft.width = parseDimensionInput(document.getElementById("dWidth").value);
+    state.draft.height = parseDimensionInput(document.getElementById("dHeight").value);
+    state.draft.style = document.getElementById("dStyle").value;
+    state.draft.quantity = parseInt(document.getElementById("dQty").value, 10) || 1;
+    state.draft.notes = document.getElementById("dNotes").value;
+    commitDraft();
+  });
+}
+
+function renderEntries() {
+  const total = state.entries.length;
+  const pieces = state.entries.reduce((s, e) => s + (Number(e.quantity) || 0), 0);
+  document.getElementById("entryCount").textContent =
+    total + (total === 1 ? " Line" : " Lines") + " · " + pieces + (pieces === 1 ? " Door" : " Doors");
+
+  const box = document.getElementById("entriesBox");
+  if (total === 0) {
+    box.innerHTML = '<div class="empty-state">No doors recorded yet. Tap the mic and call out a size, like "24 by 36, quantity 4".</div>';
+    return;
+  }
+  let html = "";
+  state.entries.forEach((e, idx) => {
+    const num = String(total - idx).padStart(3, "0");
+    if (state.editingId === e.id) {
+      html +=
+        '<div class="edit-row">' +
+          '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">' +
+            '<input class="mono" id="editWidth" value="' + decimalToFraction(e.width) + '" />' +
+            '<span style="color:var(--fs-text-dim);">×</span>' +
+            '<input class="mono" id="editHeight" value="' + decimalToFraction(e.height) + '" />' +
+            '<input class="mono" id="editQty" type="number" min="1" value="' + e.quantity + '" style="width:60px;" />' +
+            '<input class="notes" id="editNotes" value="' + escapeHtml(e.notes || "") + '" placeholder="notes" />' +
+            '<button class="icon-btn" data-action="save-edit" data-id="' + e.id + '" style="background:var(--fs-success); border-radius:5px;">✓</button>' +
+            '<button class="icon-btn" data-action="cancel-edit" style="background:var(--fs-surface-2); border-radius:5px;">✕</button>' +
+          '</div>' +
+          '<div style="width:100%;">' + buildStylePicker("editStyle", e.style) + '</div>' +
+        '</div>';
+    } else {
+      html +=
+        '<div class="entry-row">' +
+          '<div class="entry-num">№' + num + '</div>' +
+          '<div class="entry-dim">' + decimalToFraction(e.width) + ' <span class="x">×</span> ' + decimalToFraction(e.height) + '</div>' +
+          (e.style ? '<div class="entry-style stencil">' + DOOR_STYLE_ICONS[e.style] + '<span>' + escapeHtml(e.style) + '</span></div>' : '') +
+          '<div class="entry-qty stencil">QTY ' + e.quantity + '</div>' +
+          '<div class="entry-notes">' + escapeHtml(e.notes || "") + '</div>' +
+          '<button class="icon-btn" data-action="edit-entry" data-id="' + e.id + '">✎</button>' +
+          '<button class="icon-btn" data-action="delete-entry" data-id="' + e.id + '">🗑</button>' +
+        '</div>';
+    }
+  });
+  box.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function toast(msg, kind) {
+  const root = document.getElementById("toastRoot");
+  const el = document.createElement("div");
+  el.className = "toast stencil";
+  el.style.background = kind === "error" ? "var(--fs-danger)" : "var(--fs-success)";
+  el.textContent = msg;
+  root.innerHTML = "";
+  root.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 2600);
+}
+
+/* ----------------------------------------------------------------------- */
+/* CSV export handlers                                                      */
+/* ----------------------------------------------------------------------- */
+function rowsForJob(job, entries) {
+  return entries.map(e => [
+    job ? job.name : "", decimalToFraction(e.width), decimalToFraction(e.height),
+    e.unit || state.unit, e.style || "", e.quantity, e.notes || "", new Date(e.createdAt).toLocaleString(),
+  ]);
+}
+function rowsForAllJobs() {
+  let rows = [];
+  state.jobs.forEach(j => { rows = rows.concat(rowsForJob(j, loadEntriesFor(j.id))); });
+  return rows;
+}
+function exportCurrentJob() {
+  if (!state.currentJobId || state.entries.length === 0) { toast("No entries to export", "error"); return; }
+  const job = state.jobs.find(j => j.id === state.currentJobId);
+  const csv = buildCsv(rowsForJob(job, state.entries));
+  const safeName = (job ? job.name : "job").replace(/[^a-z0-9\-_]+/gi, "_");
+  downloadTextFile(safeName + "_field-scribe.csv", csv, "text/csv;charset=utf-8;");
+  toast("CSV downloaded");
+}
+function exportAllJobs() {
+  const rows = rowsForAllJobs();
+  if (rows.length === 0) { toast("No entries to export", "error"); return; }
+  const csv = buildCsv(rows);
+  downloadTextFile("all-jobs_field-scribe.csv", csv, "text/csv;charset=utf-8;");
+  toast("CSV downloaded");
+}
+
+/* ----------------------------------------------------------------------- */
+/* Email / share CSV                                                        */
+/* ----------------------------------------------------------------------- */
+const MAILTO_BODY_LIMIT = 1500; // conservative cap so mail clients don't choke on the URL
+const DEFAULT_EMAIL_KEY = "fieldscribe_default_email";
+
+function getDefaultEmail() {
+  if (!storageOk) return "";
+  return localStorage.getItem(DEFAULT_EMAIL_KEY) || "";
+}
+function setDefaultEmail(email) {
+  if (!storageOk) return;
+  if (email) localStorage.setItem(DEFAULT_EMAIL_KEY, email);
+  else localStorage.removeItem(DEFAULT_EMAIL_KEY);
+}
+
+function mailtoFallback(csv, filename, toAddress) {
+  const subject = encodeURIComponent("Field Scribe measurements — " + filename);
+  let body;
+  if (csv.length > MAILTO_BODY_LIMIT) {
+    body = encodeURIComponent(
+      "The full CSV was too large to paste into this email automatically.\n" +
+      "Please use \"Export\" in Field Scribe to download the CSV and attach it manually.\n\n" +
+      "Preview:\n" + csv.slice(0, MAILTO_BODY_LIMIT) + "\n…"
+    );
+    toast("CSV too large for email body — download & attach manually", "error");
+  } else {
+    body = encodeURIComponent("Cabinet door measurements from Field Scribe:\n\n" + csv);
+  }
+  const to = toAddress ? encodeURIComponent(toAddress) : "";
+  window.location.href = "mailto:" + to + "?subject=" + subject + "&body=" + body;
+}
+
+async function shareOrEmailCsv(scope) {
+  let rows, filename, label;
+  if (scope === "job") {
+    if (!state.currentJobId || state.entries.length === 0) { toast("No entries to share", "error"); return; }
+    const job = state.jobs.find(j => j.id === state.currentJobId);
+    rows = rowsForJob(job, state.entries);
+    const safeName = (job ? job.name : "job").replace(/[^a-z0-9\-_]+/gi, "_");
+    filename = safeName + "_field-scribe.csv";
+    label = job ? job.name : "this job";
+  } else {
+    rows = rowsForAllJobs();
+    filename = "all-jobs_field-scribe.csv";
+    label = "all jobs";
+  }
+  if (rows.length === 0) { toast("No entries to share", "error"); return; }
+  const csv = buildCsv(rows);
+  const defaultEmail = getDefaultEmail();
+
+  // If a fixed recipient is set, go straight to a mailto link so the "To" field
+  // is guaranteed to be filled in — the native share sheet can't preset a recipient.
+  if (defaultEmail) {
+    mailtoFallback(csv, filename, defaultEmail);
+    return;
+  }
+
+  let file = null;
+  try { file = new File([csv], filename, { type: "text/csv" }); } catch (e) { file = null; }
+
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: "Field Scribe — " + label,
+        text: "Cabinet door measurements from Field Scribe (" + label + ").",
+      });
+      toast("Shared");
+      return;
+    } catch (err) {
+      if (err && err.name === "AbortError") return; // user cancelled the share sheet
+      // fall through to mailto fallback below
+    }
+  }
+  mailtoFallback(csv, filename, "");
+}
+
+/* ----------------------------------------------------------------------- */
+/* Wire up static event listeners                                           */
+/* ----------------------------------------------------------------------- */
+document.getElementById("jobBtn").addEventListener("click", () => {
+  const panel = document.getElementById("jobPanel");
+  if (panel.classList.contains("hidden")) { renderJobPanel(); panel.classList.remove("hidden"); }
+  else { panel.classList.add("hidden"); }
+});
+document.addEventListener("click", (e) => {
+  const panel = document.getElementById("jobPanel");
+  if (!panel.contains(e.target) && e.target.id !== "jobBtn" && !document.getElementById("jobBtn").contains(e.target)) {
+    panel.classList.add("hidden");
+  }
+});
+
+document.getElementById("micBtn").addEventListener("click", () => {
+  if (state.listening) stopListening();
+  else startListening(state.draft ? "confirm" : "measure");
+});
+
+document.getElementById("readBackToggle").addEventListener("change", (e) => {
+  state.readBack = e.target.checked;
+  document.getElementById("readBackIcon").textContent = state.readBack ? "🔊" : "🔇";
+});
+
+document.getElementById("unitSelect").addEventListener("change", (e) => { state.unit = e.target.value; });
+
+document.getElementById("manualForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (!state.currentJobId) { toast("Create a job first — tap the folder icon, top right", "error"); return; }
+  const w = parseDimensionInput(document.getElementById("mWidth").value);
+  const h = parseDimensionInput(document.getElementById("mHeight").value);
+  const q = parseInt(document.getElementById("mQty").value, 10) || 1;
+  const style = document.getElementById("mStyle").value;
+  const notes = document.getElementById("mNotes").value.trim();
+  if (w == null || h == null) { toast("Enter valid width and height", "error"); return; }
+  const added = addEntry({ width: w, height: h, quantity: q, unit: state.unit, style, notes });
+  if (!added) return;
+  document.getElementById("mWidth").value = "";
+  document.getElementById("mHeight").value = "";
+  document.getElementById("mStylePicker").innerHTML = buildStylePicker("mStyle", "");
+  document.getElementById("mQty").value = "1";
+  document.getElementById("mNotes").value = "";
+  toast("Entry added");
+});
+
+document.addEventListener("click", (e) => {
+  const sw = e.target.closest(".style-swatch");
+  if (!sw) return;
+  const targetId = sw.dataset.target;
+  const value = sw.dataset.value;
+  const hidden = document.getElementById(targetId);
+  if (hidden) hidden.value = value;
+  const container = sw.closest(".style-picker");
+  if (container) {
+    container.querySelectorAll(".style-swatch").forEach(el => {
+      el.classList.toggle("selected", el.dataset.value === value);
+    });
+  }
+});
+
+document.getElementById("exportJobBtn").addEventListener("click", exportCurrentJob);
+document.getElementById("exportAllBtn").addEventListener("click", exportAllJobs);
+document.getElementById("emailJobBtn").addEventListener("click", () => shareOrEmailCsv("job"));
+document.getElementById("emailAllBtn").addEventListener("click", () => shareOrEmailCsv("all"));
+
+function renderDefaultEmailStatus() {
+  const email = getDefaultEmail();
+  const statusEl = document.getElementById("defaultEmailStatus");
+  if (email) {
+    statusEl.textContent = "Emails will always be addressed to: " + email;
+  } else {
+    statusEl.textContent = "No default set — Email buttons will open the share sheet / a blank email.";
+  }
+  document.getElementById("defaultEmailInput").value = email;
+}
+document.getElementById("emailSettingsForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const val = document.getElementById("defaultEmailInput").value.trim();
+  if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+    toast("Enter a valid email address", "error");
+    return;
+  }
+  setDefaultEmail(val);
+  renderDefaultEmailStatus();
+  toast(val ? "Default email saved" : "Default email cleared");
+});
+document.getElementById("clearDefaultEmailBtn").addEventListener("click", () => {
+  setDefaultEmail("");
+  renderDefaultEmailStatus();
+  toast("Default email cleared");
+});
+
+document.getElementById("entriesBox").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const id = btn.dataset.id;
+  if (action === "delete-entry") deleteEntry(id);
+  else if (action === "edit-entry") { state.editingId = id; renderEntries(); }
+  else if (action === "cancel-edit") { state.editingId = null; renderEntries(); }
+  else if (action === "save-edit") {
+    updateEntryFields(id, {
+      width: parseDimensionInput(document.getElementById("editWidth").value),
+      height: parseDimensionInput(document.getElementById("editHeight").value),
+      style: document.getElementById("editStyle").value,
+      quantity: parseInt(document.getElementById("editQty").value, 10) || 1,
+      notes: document.getElementById("editNotes").value,
+    });
+  }
+});
+
+document.getElementById("jobPanel").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const id = btn.dataset.id;
+  if (action === "select-job") selectJob(id);
+  else if (action === "delete-job") deleteJob(id);
+});
+
+/* ----------------------------------------------------------------------- */
+/* Init                                                                      */
+/* ----------------------------------------------------------------------- */
+if (!storageOk) document.getElementById("storageNote").style.display = "block";
+if (window.location.protocol === "file:") {
+  document.getElementById("originNote").style.display = "block";
+  document.getElementById("fileOriginNote").style.display = "block";
+}
+renderJobBtn();
+renderEntries();
+renderDraft();
+renderDefaultEmailStatus();
+document.getElementById("mStylePicker").innerHTML = buildStylePicker("mStyle", "");
+if (!state.currentJobId) setStatus("Create a job to start recording doors.");
+</script>
+</body>
+</html>
