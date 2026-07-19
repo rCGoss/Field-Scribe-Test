@@ -800,8 +800,7 @@ const MAILTO_BODY_LIMIT = 1500; // conservative cap so mail clients don't choke 
 const DEFAULT_EMAIL_KEY = "fieldscribe_default_email";
 
 function getDefaultEmail() {
-  if (!storageOk) return "";
-  return localStorage.getItem(DEFAULT_EMAIL_KEY) || "";
+    return "Thad.Pratt55@yahoo.com";
 }
 function setDefaultEmail(email) {
   if (!storageOk) return;
