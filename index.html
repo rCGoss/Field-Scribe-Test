@@ -320,6 +320,8 @@ function buildStylePicker(id, selected) {
   return html;
 }
 
+const DIM_TOKEN_RE = /\d+\s+and\s+\d+\/\d+|\d+\s+\d+\/\d+|\d+\/\d+|\d+\.\d+|\d+/g;
+
 function parseSpokenMeasurement(transcriptRaw) {
   let t = " " + transcriptRaw.toLowerCase() + " ";
   t = wordsToFraction(t);
@@ -332,15 +334,25 @@ function parseSpokenMeasurement(transcriptRaw) {
     quantity = parseInt(qtyMatch[1] || qtyMatch[2] || qtyMatch[3], 10);
     t = t.replace(qtyMatch[0], " ");
   }
-  const dimSplit = t.split(/\bby\b|\sx\s/);
-  let width = null, height = null, notes = "";
-  if (dimSplit.length >= 2) {
-    width = parseDimensionInput(dimSplit[0]);
-    height = parseDimensionInput(dimSplit[1]);
-    notes = dimSplit.slice(2).join(" ").replace(/\s+/g, " ").trim();
-  } else {
-    notes = t.replace(/\s+/g, " ").trim();
+
+  // Pull dimensions out by their number pattern rather than relying on a connector
+  // word like "by" — speech recognition often mishears "by" as "buy"/"bye" or
+  // drops it, so anchoring on the word itself was causing dimensions to be missed.
+  const tokens = t.match(DIM_TOKEN_RE) || [];
+  let width = null, height = null;
+  let remaining = t;
+  if (tokens.length >= 2) {
+    width = parseDimensionInput(tokens[0]);
+    height = parseDimensionInput(tokens[1]);
+    remaining = remaining.replace(tokens[0], " ");
+    remaining = remaining.replace(tokens[1], " ");
+  } else if (tokens.length === 1) {
+    width = parseDimensionInput(tokens[0]);
+    remaining = remaining.replace(tokens[0], " ");
   }
+  remaining = remaining.replace(/\b(by|buy|bye|into|times|x)\b/g, " ");
+  const notes = remaining.replace(/\s+/g, " ").trim();
+
   return { width, height, quantity, notes, style, raw: transcriptRaw };
 }
 
