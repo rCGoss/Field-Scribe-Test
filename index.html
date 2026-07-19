@@ -124,6 +124,29 @@
   .storage-note { text-align: center; font-size: 12px; color: var(--fs-text-dim); }
 
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 10px 18px; border-radius: 6px; font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: .03em; font-size: 13px; color: #fff; z-index: 50; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal-card {
+    background: var(--fs-surface); border: 1px solid var(--fs-accent); border-radius: 10px;
+    max-width: 440px; width: 100%; max-height: 85vh; overflow-y: auto;
+    padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 4px; }
+  .modal-title { font-size: 20px; font-weight: 700; }
+  .modal-close { background: none; color: var(--fs-text-dim); font-size: 22px; line-height: 1; padding: 2px 6px; border-radius: 5px; }
+  .modal-close:hover { background: var(--fs-surface-2); color: var(--fs-text); }
+  .modal-steps { list-style: none; padding: 0; margin: 14px 0 4px; display: flex; flex-direction: column; gap: 12px; }
+  .modal-steps li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; color: var(--fs-text); }
+  .modal-step-num {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 999px; background: var(--fs-accent); color: #1c211f;
+    display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600;
+  }
+  .modal-steps b { color: var(--fs-accent); }
+  .modal-footer { margin-top: 18px; display: flex; justify-content: flex-end; }
 </style>
 </head>
 <body>
@@ -134,11 +157,14 @@
       <div class="title stencil">Field Scribe</div>
       <div class="subtitle mono">CABINET DOOR TALLY — VOICE CAPTURE</div>
     </div>
-    <div style="position:relative;">
-      <button class="job-btn btn stencil" id="jobBtn" style="font-size:13px;">
-        <span>📁</span><span id="jobBtnLabel" style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">No job</span><span>▾</span>
-      </button>
-      <div class="job-panel hidden" id="jobPanel"></div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button class="btn icon-btn" id="helpBtn" title="How to use Field Scribe" style="width:36px; height:36px; border-radius:999px; background:var(--fs-surface); border:1px solid var(--fs-border); color:var(--fs-text-dim); font-size:15px; font-weight:700; font-family:'Oswald',sans-serif;">?</button>
+      <div style="position:relative;">
+        <button class="job-btn btn stencil" id="jobBtn" style="font-size:13px;">
+          <span>📁</span><span id="jobBtnLabel" style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">No job</span><span>▾</span>
+        </button>
+        <div class="job-panel hidden" id="jobPanel"></div>
+      </div>
     </div>
   </div>
 
@@ -212,6 +238,11 @@
     <button class="btn pill-btn" id="emailAllBtn" style="background:var(--fs-surface); border:1px solid var(--fs-border); color:var(--fs-text);">📧 Email All Jobs</button>
     <button class="btn pill-btn stencil" id="emailJobBtn" style="background:var(--fs-surface); border:1px solid var(--fs-accent); color:var(--fs-accent);">📧 Email This Job</button>
   </div>
+  <div class="export-row">
+    <button class="btn pill-btn" id="copyAllBtn" style="background:var(--fs-surface); border:1px solid var(--fs-border); color:var(--fs-text-dim); font-size:12px;">📋 Copy All Jobs CSV</button>
+    <button class="btn pill-btn" id="copyJobBtn" style="background:var(--fs-surface); border:1px solid var(--fs-border); color:var(--fs-text-dim); font-size:12px;">📋 Copy This Job CSV</button>
+  </div>
+  <div class="storage-note" style="margin-bottom:12px;">Email button not opening anything? Your computer may not have a default email app set. Use Copy CSV above and paste it into your email instead.</div>
 
   <div class="storage-note" id="storageNote" style="display:none;">Note: local storage isn't available — jobs will only last this session.</div>
 
@@ -220,6 +251,26 @@
     To fix it, serve the folder over localhost instead:<br/>
     <span class="mono">cd</span> into the folder this file is in, then run <span class="mono">python3 -m http.server 8000</span><br/>
     and open <span class="mono">http://localhost:8000/field-scribe.html</span> in Chrome.
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="introOverlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title stencil">Quick Start</div>
+      <button class="modal-close" id="introCloseX" title="Close">✕</button>
+    </div>
+    <div style="font-size:12px; color:var(--fs-text-dim);">Field Scribe in five steps</div>
+    <ol class="modal-steps">
+      <li><span class="modal-step-num">1</span><span>Tap <b>📁</b> top-right to create a job. Everything you record is saved to that job automatically on this device.</span></li>
+      <li><span class="modal-step-num">2</span><span>Tap the big <b>mic</b> button and call out a size — e.g. <i>"Shaker, 24 by 36, quantity 4."</i> Style and quantity are optional.</span></li>
+      <li><span class="modal-step-num">3</span><span>The app reads it back and listens for a <b>yes/no</b>. No mic, or it misheard? Edit the fields by hand, or use <b>Manual Entry</b> below the mic instead.</span></li>
+      <li><span class="modal-step-num">4</span><span>Review, edit, or delete any line in your list using the ✎ and 🗑 icons.</span></li>
+      <li><span class="modal-step-num">5</span><span>When you're done, use <b>Export</b> to download a CSV, or <b>Email</b> to send it — set a default recipient under Email Settings so it's one tap.</span></li>
+    </ol>
+    <div class="modal-footer">
+      <button class="btn pill-btn stencil" id="introGotItBtn" style="background:var(--fs-accent); color:#1c211f;">Got it</button>
+    </div>
   </div>
 </div>
 
@@ -800,7 +851,8 @@ const MAILTO_BODY_LIMIT = 1500; // conservative cap so mail clients don't choke 
 const DEFAULT_EMAIL_KEY = "fieldscribe_default_email";
 
 function getDefaultEmail() {
-    return "Thad.Pratt55@yahoo.com";
+  if (!storageOk) return "";
+  return localStorage.getItem(DEFAULT_EMAIL_KEY) || "";
 }
 function setDefaultEmail(email) {
   if (!storageOk) return;
@@ -936,6 +988,28 @@ document.getElementById("exportAllBtn").addEventListener("click", exportAllJobs)
 document.getElementById("emailJobBtn").addEventListener("click", () => shareOrEmailCsv("job"));
 document.getElementById("emailAllBtn").addEventListener("click", () => shareOrEmailCsv("all"));
 
+async function copyCsvToClipboard(scope) {
+  let rows;
+  if (scope === "job") {
+    if (!state.currentJobId || state.entries.length === 0) { toast("No entries to copy", "error"); return; }
+    const job = state.jobs.find(j => j.id === state.currentJobId);
+    rows = rowsForJob(job, state.entries);
+  } else {
+    rows = rowsForAllJobs();
+  }
+  if (rows.length === 0) { toast("No entries to copy", "error"); return; }
+  const csv = buildCsv(rows);
+  try {
+    await navigator.clipboard.writeText(csv);
+    toast("CSV copied — paste it into your email");
+  } catch (e) {
+    // Clipboard API blocked (e.g. insecure origin) — fall back to a manual copy prompt
+    window.prompt("Copy this CSV manually (Ctrl+C / Cmd+C, then Enter):", csv);
+  }
+}
+document.getElementById("copyJobBtn").addEventListener("click", () => copyCsvToClipboard("job"));
+document.getElementById("copyAllBtn").addEventListener("click", () => copyCsvToClipboard("all"));
+
 function renderDefaultEmailStatus() {
   const email = getDefaultEmail();
   const statusEl = document.getElementById("defaultEmailStatus");
@@ -992,6 +1066,30 @@ document.getElementById("jobPanel").addEventListener("click", (e) => {
 });
 
 /* ----------------------------------------------------------------------- */
+/* Intro / help modal                                                       */
+/* ----------------------------------------------------------------------- */
+const INTRO_SEEN_KEY = "fieldscribe_intro_seen";
+
+function showIntro() {
+  document.getElementById("introOverlay").classList.remove("hidden");
+}
+function hideIntro() {
+  document.getElementById("introOverlay").classList.add("hidden");
+  if (storageOk) localStorage.setItem(INTRO_SEEN_KEY, "1");
+}
+document.getElementById("helpBtn").addEventListener("click", showIntro);
+document.getElementById("introGotItBtn").addEventListener("click", hideIntro);
+document.getElementById("introCloseX").addEventListener("click", hideIntro);
+document.getElementById("introOverlay").addEventListener("click", (e) => {
+  if (e.target.id === "introOverlay") hideIntro(); // click on backdrop, not the card
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !document.getElementById("introOverlay").classList.contains("hidden")) {
+    hideIntro();
+  }
+});
+
+/* ----------------------------------------------------------------------- */
 /* Init                                                                      */
 /* ----------------------------------------------------------------------- */
 if (!storageOk) document.getElementById("storageNote").style.display = "block";
@@ -1005,6 +1103,7 @@ renderDraft();
 renderDefaultEmailStatus();
 document.getElementById("mStylePicker").innerHTML = buildStylePicker("mStyle", "");
 if (!state.currentJobId) setStatus("Create a job to start recording doors.");
+if (!storageOk || !localStorage.getItem(INTRO_SEEN_KEY)) showIntro();
 </script>
 </body>
 </html>
